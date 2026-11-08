@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Manager</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f3f5f9;
+  color:#202938;
+}
+header{
+  background:#172554;
+  color:white;
+  padding:25px;
+  text-align:center;
+}
+.container{max-width:1100px;margin:25px auto;padding:0 15px}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:15px;
+}
+.card{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 3px 12px #0000000d;
+  margin-bottom:18px;
+}
+.card h3{margin-top:0}
+.number{font-size:25px;font-weight:bold;color:#1d4ed8}
+input,select,button{
+  width:100%;padding:12px;margin:6px 0;
+  border:1px solid #d1d5db;border-radius:7px;
+  font-size:14px;
+}
+button{
+  background:#1d4ed8;color:white;border:0;
+  cursor:pointer;font-weight:bold;
+}
+button:hover{background:#1e40af}
+.danger{background:#dc2626}
+.green{color:#15803d}
+.red{color:#dc2626}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:11px;border-bottom:1px solid #e5e7eb;text-align:left}
+th{background:#eff6ff}
+.table-wrap{overflow-x:auto}
+canvas{max-height:300px}
+.small{color:#64748b;font-size:13px}
+.advice{padding:12px;background:#eff6ff;border-radius:8px;margin:8px 0}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>Money Manager</h1>
+  <p>Kelola pengeluaran, tabungan, dan keuanganmu</p>
+</header>
+
+<div class="container">
+
+  <div class="grid">
+    <div class="card">
+      <h3>Uang Mingguan</h3>
+      <div class="number" id="budgetDisplay">Rp0</div>
+    </div>
+    <div class="card">
+      <h3>Total Pengeluaran</h3>
+      <div class="number red" id="expenseDisplay">Rp0</div>
+    </div>
+    <div class="card">
+      <h3>Sisa Uang</h3>
+      <div class="number green" id="remainingDisplay">Rp0</div>
+    </div>
+    <div class="card">
+      <h3>Total Tabungan</h3>
+      <div class="number green" id="savingDisplay">Rp0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Pengaturan Keuangan</h3>
+    <label>Uang mingguan (Rp)</label>
+    <input type="number" id="weeklyBudget" value="500000" min="0">
+    <label>Target tabungan mingguan (Rp)</label>
+    <input type="number" id="savingTarget" value="100000" min="0">
+    <label>Target tabungan jangka panjang (Rp)</label>
+    <input type="number" id="longTarget" value="10000000" min="0">
+    <button onclick="saveSettings()">Simpan Pengaturan</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Tambah Pengeluaran</h3>
+      <label>Tanggal</label>
+      <input type="date" id="expenseDate">
+      <label>Nama pengeluaran</label>
+      <input type="text" id="expenseName" placeholder="Contoh: Makan siang">
+      <label>Kategori</label>
+      <select id="expenseCategory">
+        <option>Makanan</option>
+        <option>Transportasi</option>
+        <option>Kuliah</option>
+        <option>Kebutuhan pribadi</option>
+        <option>Hiburan</option>
+        <option>Belanja</option>
+        <option>Lainnya</option>
+      </select>
+      <label>Jumlah (Rp)</label>
+      <input type="number" id="expenseAmount" placeholder="Contoh: 15000" min="1">
+      <label>Catatan (opsional)</label>
+      <input type="text" id="expenseNote" placeholder="Keterangan">
+      <button onclick="addExpense()">Tambah Pengeluaran</button>
+    </div>
+
+    <div class="card">
+      <h3>Tambah Tabungan</h3>
+      <label>Tanggal</label>
+      <input type="date" id="savingDate">
+      <label>Jumlah tabungan (Rp)</label>
+      <input type="number" id="savingAmount" placeholder="Contoh: 25000" min="1">
+      <label>Keterangan</label>
+      <input type="text" id="savingNote" placeholder="Contoh: Menabung harian">
+      <button onclick="addSaving()">Simpan Tabungan</button>
+      <p class="small">Catat uang yang benar-benar sudah kamu sisihkan ke tabungan.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Analisis Keuangan Mingguan</h3>
+    <p id="weeklyInfo"></p>
+    <div id="advice"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Grafik Pengeluaran per Kategori</h3>
+      <canvas id="categoryChart"></canvas>
+    </div>
+    <div class="card">
+      <h3>Grafik Pengeluaran Harian</h3>
+      <canvas id="dailyChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Riwayat Pengeluaran</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal</th><th>Nama</th><th>Kategori</th>
+            <th>Jumlah</th><th>Catatan</th><th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="expenseTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Riwayat Tabungan</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Tanggal</th><th>Jumlah</th><th>Keterangan</th><th>Aksi</th></tr>
+        </thead>
+        <tbody id="savingTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ekspor Laporan</h3>
+    <p class="small">Unduh laporan keuangan dalam bentuk Excel dengan ringkasan, transaksi, tabungan, dan gambar grafik.</p>
+    <button onclick="exportExcel()">Download Laporan Excel (.xlsx)</button>
+    <button onclick="exportCSV()">Download Pengeluaran CSV</button>
+  </div>
+
+</div>
+
+<script>
+const rupiah = n => new Intl.NumberFormat("id-ID", {
+  style:"currency",currency:"IDR",maximumFractionDigits:0
+}).format(n);
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+let settings = JSON.parse(localStorage.getItem("mm_settings")) || {
+  budget:500000, savingTarget:100000, longTarget:10000000
+};
+
+let expenses = JSON.parse(localStorage.getItem("mm_expenses")) || [];
+let savings = JSON.parse(localStorage.getItem("mm_deposits")) || [];
+
+let categoryChart = null;
+let dailyChart = null;
+
+document.getElementById("expenseDate").value = today();
+document.getElementById("savingDate").value = today();
+
+function saveData(){
+  localStorage.setItem("mm_settings",JSON.stringify(settings));
+  localStorage.setItem("mm_expenses",JSON.stringify(expenses));
+  localStorage.setItem("mm_deposits",JSON.stringify(savings));
+}
+
+function saveSettings(){
+  settings.budget = Number(document.getElementById("weeklyBudget").value);
+  settings.savingTarget = Number(document.getElementById("savingTarget").value);
+  settings.longTarget = Number(document.getElementById("longTarget").value);
+
+  if(settings.budget < 0 || settings.savingTarget < 0 || settings.longTarget < 0){
+    alert("Nilai tidak boleh negatif.");
+    return;
+  }
+
+  saveData();
+  render();
+  alert("Pengaturan berhasil disimpan!");
+}
+
+function getWeekRange(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  monday.setHours(0,0,0,0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate()+6);
+  sunday.setHours(23,59,59,999);
+
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+  return {start:fmt(monday),end:fmt(sunday)};
+}
+
+function inCurrentWeek(date){
+  const range = getWeekRange();
+  return date >= range.start && date <= range.end;
+}
+
+function addExpense(){
+  const name = document.getElementById("expenseName").value.trim();
+  const date = document.getElementById("expenseDate").value;
+  const category = document.getElementById("expenseCategory").value;
+  const amount = Number(document.getElementById("expenseAmount").value);
+  const note = document.getElementById("expenseNote").value.trim();
+
+  if(!name || !date || amount <= 0){
+    alert("Isi nama, tanggal, dan jumlah pengeluaran dengan benar.");
+    return;
+  }
+
+  expenses.push({id:Date.now(),date,name,category,amount,note});
+  saveData();
+
+  document.getElementById("expenseName").value="";
+  document.getElementById("expenseAmount").value="";
+  document.getElementById("expenseNote").value="";
+
+  render();
+}
+
+function addSaving(){
+  const date = document.getElementById("savingDate").value;
+  const amount = Number(document.getElementById("savingAmount").value);
+  const note = document.getElementById("savingNote").value.trim();
+
+  if(!date || amount <= 0){
+    alert("Masukkan tanggal dan jumlah tabungan yang benar.");
+    return;
+  }
+
+  savings.push({id:Date.now(),date,amount,note});
+  saveData();
+
+  document.getElementById("savingAmount").value="";
+  document.getElementById("savingNote").value="";
+
+  render();
+}
+
+function deleteExpense(id){
+  if(confirm("Hapus catatan pengeluaran ini?")){
+    expenses = expenses.filter(x=>x.id!==id);
+    saveData();
+    render();
+  }
+}
+
+function deleteSaving(id){
+  if(confirm("Hapus catatan tabungan ini?")){
+    savings = savings.filter(x=>x.id!==id);
+    saveData();
+    render();
+  }
+}
+
+function render(){
+  document.getElementById("weeklyBudget").value=settings.budget;
+  document.getElementById("savingTarget").value=settings.savingTarget;
+  document.getElementById("longTarget").value=settings.longTarget;
+
+  const weekExpenses = expenses.filter(x=>inCurrentWeek(x.date));
+  const weekSavings = savings.filter(x=>inCurrentWeek(x.date));
+
+  const totalExpense = weekExpenses.reduce((s,x)=>s+x.amount,0);
+  const totalSavingWeek = weekSavings.reduce((s,x)=>s+x.amount,0);
+  const totalSavingAll = savings.reduce((s,x)=>s+x.amount,0);
+  const remaining = settings.budget-totalExpense;
+
+  document.getElementById("budgetDisplay").textContent=rupiah(settings.budget);
+  document.getElementById("expenseDisplay").textContent=rupiah(totalExpense);
+  document.getElementById("remainingDisplay").textContent=rupiah(remaining);
+  document.getElementById("remainingDisplay").className =
+    "number "+(remaining>=0?"green":"red");
+  document.getElementById("savingDisplay").textContent=rupiah(totalSavingAll);
+
+  document.getElementById("weeklyInfo").innerHTML =
+    `Periode: ${getWeekRange().start} sampai ${getWeekRange().end}<br>`+
+    `Pengeluaran minggu ini: <b>${rupiah(totalExpense)}</b><br>`+
+    `Tabungan minggu ini: <b>${rupiah(totalSavingWeek)}</b><br>`+
+    `Target tabungan mingguan: <b>${rupiah(settings.savingTarget)}</b>`;
+
+  makeAdvice(totalExpense,totalSavingWeek,totalSavingAll,remaining,weekExpenses);
+  renderTables();
+  renderCharts(weekExpenses);
+}
+
+function makeAdvice(expense,saving,savingAll,remaining,weekExpenses){
+  const box=document.getElementById("advice");
+  const messages=[];
+
+  if(expense===0){
+    messages.push("Belum ada pengeluaran tercatat minggu ini. Catat setiap transaksi agar evaluasi lebih akurat.");
+  }else if(remaining<0){
+    messages.push("Pengeluaran sudah melewati anggaran mingguan. Kurangi belanja yang tidak mendesak.");
+  }else if(expense/settings.budget>=0.8){
+    messages.push("Kamu sudah menggunakan minimal 80% anggaran. Hati-hati dengan pengeluaran berikutnya.");
+  }else{
+    messages.push("Pengeluaran masih dalam batas anggaran. Pertahankan kebiasaan ini.");
+  }
+
+  if(saving>=settings.savingTarget){
+    messages.push("Bagus! Target tabungan mingguan sudah tercapai. Pertahankan konsistensimu.");
+  }else{
+    messages.push(`Kamu masih perlu menabung ${rupiah(settings.savingTarget-saving)} untuk mencapai target mingguan.`);
+  }
+
+  const categories={};
+  weekExpenses.forEach(x=>{
+    categories[x.category]=(categories[x.category]||0)+x.amount;
+  });
+
+  const biggest=Object.entries(categories).sort((a,b)=>b[1]-a[1])[0];
+
+  if(biggest){
+    messages.push(`Kategori pengeluaran terbesar adalah ${biggest[0]} sebesar ${rupiah(biggest[1])}. Evaluasi apakah pengeluaran ini bisa dikurangi.`);
+  }
+
+  const progress=settings.longTarget>0
+    ?Math.min(100,savingAll/settings.longTarget*100):0;
+
+  messages.push(`Progres target tabungan jangka panjang: ${progress.toFixed(1)}% dari ${rupiah(settings.longTarget)}.`);
+
+  box.innerHTML=messages.map(m=>`<div class="advice">${m}</div>`).join("");
+}
+
+function renderTables(){
+  const eBody=document.getElementById("expenseTable");
+  eBody.innerHTML="";
+
+  [...expenses].sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>{
+    eBody.innerHTML+=`
+      <tr>
+        <td>${x.date}</td>
+        <td>${escapeHTML(x.name)}</td>
+        <td>${escapeHTML(x.category)}</td>
+        <td>${rupiah(x.amount)}</td>
+        <td>${escapeHTML(x.note||"-")}</td>
+        <td><button class="danger" onclick="deleteExpense(${x.id})">Hapus</button></td>
+      </tr>`;
+  });
+
+  if(!expenses.length){
+    eBody.innerHTML='<tr><td colspan="6">Belum ada pengeluaran.</td></tr>';
+  }
+
+  const sBody=document.getElementById("savingTable");
+  sBody.innerHTML="";
+
+  [...savings].sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>{
+    sBody.innerHTML+=`
+      <tr>
+        <td>${x.date}</td>
+        <td>${rupiah(x.amount)}</td>
+        <td>${escapeHTML(x.note||"-")}</td>
+        <td><button class="danger" onclick="deleteSaving(${x.id})">Hapus</button></td>
+      </tr>`;
+  });
+
+  if(!savings.length){
+    sBody.innerHTML='<tr><td colspan="4">Belum ada tabungan.</td></tr>';
+  }
+}
+
+function escapeHTML(value){
+  return String(value).replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function renderCharts(data){
+  const categories={};
+  data.forEach(x=>{
+    categories[x.category]=(categories[x.category]||0)+x.amount;
+  });
+
+  if(categoryChart) categoryChart.destroy();
+
+  categoryChart=new Chart(document.getElementById("categoryChart"),{
+    type:"doughnut",
+    data:{
+      labels:Object.keys(categories).length?Object.keys(categories):["Belum ada data"],
+      datasets:[{
+        data:Object.values(categories).length?Object.values(categories):[1]
+      }]
+    },
+    options:{responsive:true}
+  });
+
+  const daily={};
+  data.forEach(x=>{
+    daily[x.date]=(daily[x.date]||0)+x.amount;
+  });
+
+  if(dailyChart) dailyChart.destroy();
+
+  dailyChart=new Chart(document.getElementById("dailyChart"),{
+    type:"bar",
+    data:{
+      labels:Object.keys(daily).length?Object.keys(daily):["Belum ada data"],
+      datasets:[{
+        label:"Pengeluaran (Rp)",
+        data:Object.values(daily).length?Object.values(daily):[0]
+      }]
+    },
+    options:{
+      responsive:true,
+      scales:{y:{beginAtZero:true}}
+    }
+  });
+}
+
+async function exportExcel(){
+  if(typeof ExcelJS==="undefined"){
+    alert("Library Excel belum berhasil dimuat. Periksa koneksi internet lalu muat ulang halaman.");
+    return;
+  }
+
+  const workbook=new ExcelJS.Workbook();
+  workbook.creator="Money Manager";
+  workbook.created=new Date();
+
+  const range=getWeekRange();
+  const weekExpenses=expenses.filter(x=>inCurrentWeek(x.date));
+  const weekSavings=savings.filter(x=>inCurrentWeek(x.date));
+
+  const totalExpense=weekExpenses.reduce((s,x)=>s+x.amount,0);
+  const totalSavingWeek=weekSavings.reduce((s,x)=>s+x.amount,0);
+  const totalSavingAll=savings.reduce((s,x)=>s+x.amount,0);
+
+  // SHEET RINGKASAN
+  const summary=workbook.addWorksheet("Ringkasan");
+
+  summary.addRow(["LAPORAN KEUANGAN MONEY MANAGER"]);
+  summary.addRow([`Periode ${range.start} sampai ${range.end}`]);
+  summary.addRow([]);
+  summary.addRow(["Keterangan","Jumlah"]);
+  summary.addRow(["Uang mingguan",settings.budget]);
+  summary.addRow(["Total pengeluaran minggu ini",totalExpense]);
+  summary.addRow(["Sisa uang",settings.budget-totalExpense]);
+  summary.addRow(["Target tabungan mingguan",settings.savingTarget]);
+  summary.addRow(["Tabungan minggu ini",totalSavingWeek]);
+  summary.addRow(["Total seluruh tabungan",totalSavingAll]);
+  summary.addRow(["Target tabungan jangka panjang",settings.longTarget]);
+  summary.addRow([]);
+
+  const adviceText = totalExpense>settings.budget
+    ? "Pengeluaran melebihi anggaran. Evaluasi pengeluaran yang tidak mendesak."
+    : totalExpense/settings.budget>=0.8
+      ? "Pengeluaran mendekati batas anggaran. Kurangi belanja yang tidak penting."
+      : "Pengeluaran masih dalam batas anggaran. Pertahankan kebiasaan baik.";
+
+  summary.addRow(["EVALUASI DAN SARAN"]);
+  summary.addRow([adviceText]);
+  summary.addRow([totalSavingWeek>=settings.savingTarget
+    ? "Target tabungan mingguan tercapai."
+    : `Kekurangan tabungan minggu ini: ${rupiah(settings.savingTarget-totalSavingWeek)}`
+  ]);
+
+  summary.mergeCells("A1:B1");
+  summary.mergeCells("A2:B2");
+  summary.mergeCells("A13:B13");
+  summary.mergeCells("A14:B14");
+  summary.mergeCells("A15:B15");
+
+  summary.getRow(1).font={bold:true,size:16};
+  summary.getRow(4).font={bold:true};
+  summary.getRow(13).font={bold:true};
+  summary.getRow(14).alignment={wrapText:true,vertical:"top"};
+  summary.getRow(14).height=45;
+  summary.getColumn(1).width=38;
+  summary.getColumn(2).width=25;
+
+  for(let r=5;r<=11;r++){
+    summary.getCell(`B${r}`).numFmt='"Rp" #,##0';
+  }
+
+  // SHEET PENGELUARAN
+  const expSheet=workbook.addWorksheet("Pengeluaran");
+  expSheet.addRow(["Tanggal","Nama","Kategori","Jumlah (Rp)","Catatan"]);
+  expenses.forEach(x=>{
+    expSheet.addRow([x.date,x.name,x.category,x.amount,x.note]);
+  });
+  expSheet.getRow(1).font={bold:true};
+  expSheet.columns=[
+    {width:16},{width:25},{width:22},{width:18},{width:30}
+  ];
+  expSheet.getColumn(4).numFmt='"Rp" #,##0';
+
+  // SHEET TABUNGAN
+  const saveSheet=workbook.addWorksheet("Tabungan");
+  saveSheet.addRow(["Tanggal","Jumlah (Rp)","Keterangan"]);
+  savings.forEach(x=>{
+    saveSheet.addRow([x.date,x.amount,x.note]);
+  });
+  saveSheet.getRow(1).font={bold:true};
+  saveSheet.columns=[{width:18},{width:20},{width:35}];
+  saveSheet.getColumn(2).numFmt='"Rp" #,##0';
+
+  // SHEET GRAFIK
+  const chartSheet=workbook.addWorksheet("Grafik");
+  chartSheet.addRow(["GRAFIK PENGELUARAN MINGGUAN"]);
+  chartSheet.mergeCells("A1:H1");
+  chartSheet.getRow(1).font={bold:true,size:16};
+
+  try{
+    const categoryImage=categoryChart.toBase64Image();
+    const dailyImage=dailyChart.toBase64Image();
+
+    const image1=workbook.addImage({
+      base64:categoryImage,
+      extension:"png"
+    });
+
+    const image2=workbook.addImage({
+      base64:dailyImage,
+      extension:"png"
+    });
+
+    chartSheet.addImage(image1,"A3:G18");
+    chartSheet.addImage(image2,"A20:G35");
+  }catch(error){
+    chartSheet.addRow(["Grafik tidak dapat dimasukkan."]);
+  }
+
+  const buffer=await workbook.xlsx.writeBuffer();
+  const blob=new Blob([buffer],{
+    type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;
+  link.download=`Laporan-Keuangan-${today()}.xlsx`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV(){
+  const rows=[
+    ["Tanggal","Nama","Kategori","Jumlah","Catatan"],
+    ...expenses.map(x=>[x.date,x.name,x.category,x.amount,x.note])
+  ];
+
+  const csv="\uFEFF"+rows.map(row=>
+    row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")
+  ).join("\n");
+
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`Pengeluaran-${today()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("weeklyBudget").value=settings.budget;
+document.getElementById("savingTarget").value=settings.savingTarget;
+document.getElementById("longTarget").value=settings.longTarget;
+
+render();
+</script>
+
+</body>
+</html>
